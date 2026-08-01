@@ -76,8 +76,9 @@ if [ ! -d \\$ACTIONS_RUNNER_DIRECTORY ]; then
   fi
 fi
 
-# Holds environment passed to runner.
-RUNNER_ENV=""
+# Holds environment passed to runner. Keep host-provisioned Rust and Homebrew
+# tools available even when Terminal starts the runner with a minimal PATH.
+RUNNER_ENV="PATH=\\$HOME/.cargo/bin:/opt/homebrew/bin:\\$PATH\n"
 
 # Configure pre-run script.
 PRE_RUN_SCRIPT_PATH="\\$HOME/.tartelet/pre-run.sh"
