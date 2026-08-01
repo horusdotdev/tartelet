@@ -1,6 +1,6 @@
 name: Tartelet
 options:
-  bundleIdPrefix: dk.shape
+  bundleIdPrefix: dev.horusdotdev
   developmentLanguage: en
 configs:
   Debug: debug

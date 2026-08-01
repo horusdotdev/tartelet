@@ -94,6 +94,9 @@ enum Composers {
 
 private extension Composers {
     private static func keychain(logger: Logger) -> Keychain {
-        Keychain(logger: logger, accessGroup: "566MC7D8D4.dk.shape.Tartelet")
+        // Use the current user's default keychain. The upstream access group is
+        // tied to Shape's Apple Developer team and cannot be used by local or
+        // independently signed builds of this fork.
+        Keychain(logger: logger)
     }
 }
