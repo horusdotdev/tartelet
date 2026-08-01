@@ -9,6 +9,7 @@ public final class KeychainGitHubCredentialsStore: GitHubCredentialsStore {
         static let repositoryName = "github.credentials.repositoryName"
         static let ownerName = "github.credentials.ownerName"
         static let appId = "github.credentials.appId"
+        static let privateKey = "github.credentials.privateKey"
     }
 
     private enum KeyTag {
@@ -45,7 +46,10 @@ public final class KeychainGitHubCredentialsStore: GitHubCredentialsStore {
     }
     public var privateKey: Data? {
         access(keyPath: \.privateKey)
-        return keychain.key(withTag: KeyTag.privateKey)?.data
+        return keychain.password(
+            forAccount: PasswordAccount.privateKey,
+            belongingToService: serviceName
+        ) ?? keychain.key(withTag: KeyTag.privateKey)?.data
     }
 
     private let keychain: Keychain
@@ -123,9 +127,18 @@ public final class KeychainGitHubCredentialsStore: GitHubCredentialsStore {
 
     public func setPrivateKey(_ privateKeyData: Data?) {
         withMutation(keyPath: \.privateKey) {
-            if let privateKeyData, let key = RSAPrivateKey(privateKeyData) {
-                _ = keychain.setKey(key, withTag: KeyTag.privateKey)
+            if let privateKeyData, RSAPrivateKey(privateKeyData) != nil {
+                _ = keychain.setPassword(
+                    privateKeyData,
+                    forAccount: PasswordAccount.privateKey,
+                    belongingToService: serviceName
+                )
+                keychain.removeKey(withTag: KeyTag.privateKey)
             } else {
+                keychain.removePassword(
+                    forAccount: PasswordAccount.privateKey,
+                    belongingToService: serviceName
+                )
                 keychain.removeKey(withTag: KeyTag.privateKey)
             }
         }
