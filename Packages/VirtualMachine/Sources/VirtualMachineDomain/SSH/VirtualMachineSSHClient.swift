@@ -49,7 +49,10 @@ public struct VirtualMachineSSHClient<SSHClientType: SSHClient> {
         let connection = try await connectToVirtualMachine(
             named: virtualMachine.name,
             on: ipAddress,
-            maximumAttempts: 3
+            // Tart can report an IP well before macOS finishes starting sshd.
+            // Allow up to one minute for a newly cloned runner VM to become
+            // reachable instead of recycling it after only four seconds.
+            maximumAttempts: 30
         )
         try await connectionHandler.didConnect(to: virtualMachine, through: connection)
         return connection
