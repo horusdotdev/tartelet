@@ -38,10 +38,19 @@ public final class VirtualMachineFleet {
     }
 
     public func stopImmediately() {
-        isStarted = false
-        isStopping = false
-        for (_, task) in activeTasks {
+        for task in beginStoppingImmediately() {
             task.cancel()
+        }
+        activeTasks = [:]
+    }
+
+    public func stopImmediatelyAndWait() async {
+        let tasks = beginStoppingImmediately()
+        for task in tasks {
+            task.cancel()
+        }
+        for task in tasks {
+            await task.value
         }
         activeTasks = [:]
     }
@@ -52,6 +61,12 @@ public final class VirtualMachineFleet {
 }
 
 private extension VirtualMachineFleet {
+    private func beginStoppingImmediately() -> [Task<(), Never>] {
+        isStarted = false
+        isStopping = false
+        return Array(activeTasks.values)
+    }
+
     private func startSequentiallyRunningVirtualMachines(named name: String) {
         let task = Task {
             while !Task.isCancelled {
@@ -75,45 +90,45 @@ private extension VirtualMachineFleet {
             logger.info("Task running virtual machine named \(name) was cancelled.")
             activeTasks.removeValue(forKey: name)
             if activeTasks.isEmpty {
-                stopImmediately()
+                isStarted = false
+                isStopping = false
             }
         }
         activeTasks[name] = task
     }
 
     private func runVirtualMachine(_ virtualMachine: VirtualMachine) async throws {
-        try await withTaskCancellationHandler {
-            logger.info("Start virtual machine named \(virtualMachine.name)")
-            do {
-                try await virtualMachine.start()
-                logger.info("Did stop virtual machine named \(virtualMachine.name)")
-                do {
-                    try await virtualMachine.delete()
-                    logger.info("Did delete virtual machine named \(virtualMachine.name)")
-                } catch {
-                    logger.info("Could not delete virtual machine named \(virtualMachine.name)")
-                    throw error
-                }
-            } catch {
-                logger.info(
-                    "Virtual machine named \(virtualMachine.name) stopped with message: "
+        logger.info("Start virtual machine named \(virtualMachine.name)")
+        let startResult: Result<Void, Error>
+        do {
+            try await virtualMachine.start()
+            logger.info("Did stop virtual machine named \(virtualMachine.name)")
+            startResult = .success(())
+        } catch {
+            logger.info(
+                "Virtual machine named \(virtualMachine.name) stopped with message: "
                     + error.localizedDescription
-                )
+            )
+            startResult = .failure(error)
+        }
+
+        // Cleanup must not inherit cancellation from the fleet task. Keep the cleanup task
+        // owned and awaited so application termination cannot finish while deletion is in flight.
+        do {
+            try await Task.detached(priority: .high) {
+                try await virtualMachine.delete()
+            }.value
+            logger.info("Did delete virtual machine named \(virtualMachine.name)")
+        } catch {
+            logger.info(
+                "Could not delete virtual machine named \(virtualMachine.name): "
+                    + error.localizedDescription
+            )
+            if case .success = startResult {
                 throw error
             }
-        } onCancel: {
-            Task.detached(priority: .high) {
-                self.logger.info("Stop virtual machine named \(virtualMachine.name)")
-                do {
-                    try await virtualMachine.delete()
-                } catch {
-                    self.logger.info(
-                        "Could not delete virtual machine named \(virtualMachine.name): "
-                        + error.localizedDescription
-                    )
-                    throw error
-                }
-            }
         }
+
+        try startResult.get()
     }
 }
