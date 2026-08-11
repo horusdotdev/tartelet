@@ -33,10 +33,12 @@ public struct ProcessShell: Shell {
             try sendableProcess.run()
             var didWaitForExit = false
             defer {
-                // Once launched, always reap the child, including when pipe handling fails.
+                // Once launched, always reap the child and await cancellation cleanup,
+                // including when pipe handling fails.
                 if !didWaitForExit {
                     process.waitUntilExit()
                 }
+                sendableProcess.waitForCancellationCleanup()
             }
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             // Explicitly close the pipe file handle to prevent running out of file descriptors.

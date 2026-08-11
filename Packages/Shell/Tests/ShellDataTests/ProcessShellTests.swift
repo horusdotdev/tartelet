@@ -52,7 +52,7 @@ final class ProcessShellTests: XCTestCase {
         XCTAssertLessThan(cancellationTime.duration(to: clock.now), .seconds(2))
     }
 
-    func testCancellationKillsProcessThatIgnoresTermination() async throws {
+    func testCancellationKillsProcessThatIgnoresInterrupt() async throws {
         let markerURL = FileManager.default.temporaryDirectory
             .appending(component: UUID().uuidString)
         defer {
@@ -63,7 +63,7 @@ final class ProcessShellTests: XCTestCase {
                 atPath: "/usr/bin/perl",
                 withArguments: [
                     "-e",
-                    "$SIG{TERM} = 'IGNORE'; open(my $fh, '>', $ARGV[0]); close($fh); sleep 30",
+                    "$SIG{INT} = 'IGNORE'; open(my $fh, '>', $ARGV[0]); close($fh); sleep 30",
                     markerURL.path
                 ],
                 environment: ProcessInfo.processInfo.environment
@@ -79,6 +79,47 @@ final class ProcessShellTests: XCTestCase {
         _ = try? await task.value
 
         XCTAssertLessThan(cancellationTime.duration(to: clock.now), .seconds(2))
+    }
+
+    func testCancellationKillsDescendantProcess() async throws {
+        let markerURL = FileManager.default.temporaryDirectory
+            .appending(component: UUID().uuidString)
+        defer {
+            try? FileManager.default.removeItem(at: markerURL)
+        }
+        let task = Task {
+            try await ProcessShell(terminationGracePeriod: 0.1).runExecutable(
+                atPath: "/bin/sh",
+                withArguments: [
+                    "-c",
+                    "sleep 30 & child=$!; echo $child > \"$1\"; wait",
+                    "process-shell-test",
+                    markerURL.path
+                ],
+                environment: ProcessInfo.processInfo.environment
+            )
+        }
+        try await waitUntil {
+            guard let contents = try? String(contentsOf: markerURL, encoding: .utf8) else {
+                return false
+            }
+            return !contents.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        let childPID = try XCTUnwrap(
+            pid_t(String(contentsOf: markerURL, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines))
+        )
+        defer {
+            if Darwin.kill(childPID, 0) == 0 {
+                Darwin.kill(childPID, SIGKILL)
+            }
+        }
+
+        task.cancel()
+        _ = try? await task.value
+
+        XCTAssertEqual(Darwin.kill(childPID, 0), -1)
+        XCTAssertEqual(errno, ESRCH)
     }
 
     private func waitUntil(
