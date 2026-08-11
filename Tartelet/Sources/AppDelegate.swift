@@ -6,6 +6,7 @@ import VirtualMachineDomain
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsStore = Composers.settingsStore
     private let dock = Dock()
+    private var isTerminationPending = false
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         dock.setIconShown(Composers.settingsStore.applicationUIMode.showInDock)
@@ -30,9 +31,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    func applicationWillTerminate(_ notification: Notification) {
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !isTerminationPending else {
+            return .terminateLater
+        }
+        isTerminationPending = true
         Composers.editor.stop()
-        Composers.fleet.stop()
+        Task { @MainActor in
+            await Composers.fleet.stopImmediatelyAndWait()
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 }
 

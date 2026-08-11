@@ -18,10 +18,10 @@ private enum StartVirtualMachineError: LocalizedError, CustomDebugStringConverti
 
     var debugDescription: String {
         switch self {
-        case .failedStartingVirtualMachine:
-            "Failed starting virtual machine"
-        case .failedEstablishingSSHConnection:
-            "Failed establishing SSH connection"
+        case let .failedStartingVirtualMachine(error):
+            "Failed starting virtual machine: \(error.localizedDescription)"
+        case let .failedEstablishingSSHConnection(error):
+            "Failed establishing SSH connection: \(error.localizedDescription)"
         case .cancelled:
             "Task was cancelled"
         }
