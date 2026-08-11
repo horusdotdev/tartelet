@@ -11,5 +11,5 @@ public struct GitHubRunnerDownload: Codable {
     let os: String
     let architecture: String
     let downloadURL: URL
-    let sha256Checksum: String
+    let sha256Checksum: String?
 }
