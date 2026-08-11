@@ -6,8 +6,8 @@ public protocol GitHubClient {
         with appAccessToken: GitHubAppAccessToken,
         runnerScope: GitHubRunnerScope
     ) async throws -> GitHubRunnerRegistrationToken
-    func getRunnerDownloadURL(
+    func getRunnerArchive(
         with appAccessToken: GitHubAppAccessToken,
         runnerScope: GitHubRunnerScope
-    ) async throws -> URL
+    ) async throws -> GitHubRunnerArchive
 }

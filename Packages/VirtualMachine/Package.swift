@@ -35,6 +35,12 @@ let package = Package(
         ]),
         .testTarget(name: "VirtualMachineDataTests", dependencies: [
             "VirtualMachineData"
+        ]),
+        .testTarget(name: "VirtualMachineDomainTests", dependencies: [
+            "VirtualMachineDomain",
+            .product(name: "GitHubDomain", package: "GitHub"),
+            .product(name: "LoggingDomain", package: "Logging"),
+            .product(name: "SSHDomain", package: "SSH")
         ])
     ]
 )

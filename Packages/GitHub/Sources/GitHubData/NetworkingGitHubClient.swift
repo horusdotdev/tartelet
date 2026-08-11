@@ -2,7 +2,7 @@ import Foundation
 import GitHubDomain
 import NetworkingDomain
 
-private enum NetworkingGitHubClientError: LocalizedError {
+enum NetworkingGitHubClientError: LocalizedError {
     case organizationNameUnavailable
     case repositoryNameUnavailable
     case repositoryOwnerNameUnavailable
@@ -10,6 +10,7 @@ private enum NetworkingGitHubClientError: LocalizedError {
     case privateKeyUnavailable
     case appIsNotInstalled
     case downloadNotFound(os: String, architecture: String)
+    case checksumNotFound(os: String, architecture: String)
 
     var errorDescription: String? {
         switch self {
@@ -27,6 +28,8 @@ private enum NetworkingGitHubClientError: LocalizedError {
             return "The GitHub app has not been installed. Please install it from the developer settings."
         case let .downloadNotFound(os, architecture):
             return "Could not find a download for \(os) (\(architecture))"
+        case let .checksumNotFound(os, architecture):
+            return "The download for \(os) (\(architecture)) does not include a SHA-256 checksum"
         }
     }
 }
@@ -60,10 +63,10 @@ public final class NetworkingGitHubClient: GitHubClient {
         }
     }
 
-    public func getRunnerDownloadURL(
+    public func getRunnerArchive(
         with appAccessToken: GitHubAppAccessToken,
         runnerScope: GitHubRunnerScope
-    ) async throws -> URL {
+    ) async throws -> GitHubRunnerArchive {
         let url = try await baseURL.appending(path: runnerScope.runnerDownloadPath(using: credentialsStore))
         let request = URLRequest(url: url).addingBearerToken(appAccessToken.rawValue)
         let downloads = try await networkingService.load([GitHubRunnerDownload].self, from: request).map(\.value)
@@ -72,7 +75,13 @@ public final class NetworkingGitHubClient: GitHubClient {
         guard let download = downloads.first(where: { $0.os == os && $0.architecture == architecture }) else {
             throw NetworkingGitHubClientError.downloadNotFound(os: os, architecture: architecture)
         }
-        return download.downloadURL
+        guard let sha256Checksum = download.sha256Checksum, !sha256Checksum.isEmpty else {
+            throw NetworkingGitHubClientError.checksumNotFound(os: os, architecture: architecture)
+        }
+        return GitHubRunnerArchive(
+            downloadURL: download.downloadURL,
+            sha256Checksum: sha256Checksum
+        )
     }
 
     public func getRunnerRegistrationToken(
