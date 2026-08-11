@@ -32,7 +32,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         Composers.editor.stop()
-        Composers.fleet.stop()
+        // Graceful fleet stopping waits for the current jobs to finish. At application
+        // termination there is no time to wait, so cancel the tasks that own `tart run`.
+        Composers.fleet.stopImmediately()
     }
 }
 

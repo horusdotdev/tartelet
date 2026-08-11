@@ -8,11 +8,19 @@ public final class VirtualMachineFleet {
 
     private let logger: Logger
     private let baseVirtualMachine: VirtualMachine
+    private let failureRetryDelay: Duration
     private var activeTasks: [String: Task<(), Never>] = [:]
 
     public init(logger: Logger, baseVirtualMachine: VirtualMachine) {
         self.logger = logger
         self.baseVirtualMachine = baseVirtualMachine
+        failureRetryDelay = .seconds(5)
+    }
+
+    init(logger: Logger, baseVirtualMachine: VirtualMachine, failureRetryDelay: Duration) {
+        self.logger = logger
+        self.baseVirtualMachine = baseVirtualMachine
+        self.failureRetryDelay = failureRetryDelay
     }
 
     public func start(numberOfMachines: Int) {
@@ -54,10 +62,14 @@ private extension VirtualMachineFleet {
                         activeTasks[name]?.cancel()
                     }
                 } catch {
-                    // Ignore the error and try again until the task is cancelled. The error should
-                    // have been logged so we know what is going on in case we need to debug.
-                    // However, the actual error is not important at this point so we ignore it and
-                    // let the loop run again, thus giving us another chance to start the virtual machine.
+                    guard !Task.isCancelled else {
+                        continue
+                    }
+                    logger.error(
+                        "Retrying virtual machine named \(name) in \(failureRetryDelay): "
+                            + error.localizedDescription
+                    )
+                    try? await Task.sleep(for: failureRetryDelay)
                 }
             }
             logger.info("Task running virtual machine named \(name) was cancelled.")

@@ -63,6 +63,10 @@ private extension VirtualMachineSSHClient {
     private func getIPAddress(of virtualMachine: VirtualMachine) async throws -> String {
         do {
             return try await ipAddressReader.readIPAddress(of: virtualMachine)
+        } catch is CancellationError {
+            // Starting the VM and obtaining its IP race in a task group. If VM startup fails,
+            // cancellation of this sibling is expected and the startup error is the useful one.
+            throw CancellationError()
         } catch {
             logger.error(
                 "Failed obtaining IP address of virtual machine named \(virtualMachine.name): "
