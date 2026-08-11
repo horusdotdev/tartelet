@@ -42,7 +42,7 @@ public final class FileLogger: LoggingDomain.Logger {
     }
 
     public func error(_ message: String) {
-        try? append(.info, message: message)
+        try? append(.error, message: message)
     }
 }
 

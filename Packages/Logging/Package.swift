@@ -22,6 +22,11 @@ let package = Package(
             "LoggingDomain",
             .product(name: "FileSystemDomain", package: "FileSystem")
         ]),
-        .target(name: "LoggingDomain")
+        .target(name: "LoggingDomain"),
+        .testTarget(name: "LoggingDataTests", dependencies: [
+            "LoggingData",
+            "LoggingDomain",
+            .product(name: "FileSystemDomain", package: "FileSystem")
+        ])
     ]
 )
